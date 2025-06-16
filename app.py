@@ -144,4 +144,53 @@ def download_video():
         error_msg = str(e)
         if "Sign in to confirm" in error_msg or "bot" in error_msg:
             return jsonify({
-                'error': 'Vídeo temporariamente bloquead
+                'error': 'Vídeo temporariamente bloqueado pelo YouTube. Tente outro vídeo ou aguarde alguns minutos.',
+                'details': error_msg,
+                'suggestion': 'Use vídeos públicos sem restrições de idade ou região.'
+            }), 400
+        return jsonify({'error': f'Erro no download: {error_msg}'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@app.route('/info', methods=['POST'])
+def get_video_info():
+    """Obter apenas informações do vídeo sem baixar"""
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type deve ser application/json'}), 400
+        
+        data = request.get_json()
+        url = data.get('url')
+        
+        if not url:
+            return jsonify({'error': 'URL é obrigatória'}), 400
+        
+        # Configurar yt-dlp apenas para extrair info
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extractor_args': {
+                'youtube': {
+                    'skip': ['dash', 'hls'],
+                    'player_client': ['android', 'web']
+                }
+            },
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            
+            return jsonify({
+                'title': info.get('title'),
+                'uploader': info.get('uploader'),
+                'duration': info.get('duration'),
+                'view_count': info.get('view_count'),
+                'upload_date': info.get('upload_date'),
+                'description': info.get('description', '')[:200] + '...' if info.get('description') else None
+            })
+            
+    except Exception as e:
+        return jsonify({'error': f'Erro ao obter informações: {str(e)}'}), 400
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
