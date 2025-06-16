@@ -46,6 +46,16 @@ def download_audio(url, output_path):
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
+        # Opções para contornar bloqueios
+        'extractor_args': {
+            'youtube': {
+                'skip': ['dash', 'hls'],
+                'player_client': ['android', 'web']
+            }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
     }
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -69,7 +79,7 @@ def home():
     """Página inicial com documentação"""
     return jsonify({
         'service': 'YouTube Audio Downloader API',
-        'version': '1.0.0',
+        'version': '1.1.0',
         'endpoints': {
             'POST /download': {
                 'description': 'Baixar áudio de um vídeo do YouTube',
@@ -82,7 +92,8 @@ def home():
             },
             'GET /health': 'Verificar status da API'
         },
-        'usage': 'curl -X POST -H "Content-Type: application/json" -d \'{"url":"https://youtube.com/watch?v=ID"}\' http://your-domain/download'
+        'usage': 'curl -X POST -H "Content-Type: application/json" -d \'{"url":"https://youtube.com/watch?v=ID"}\' http://your-domain/download',
+        'notes': 'Alguns vídeos podem estar bloqueados pelo YouTube. Tente URLs diferentes se necessário.'
     })
 
 @app.route('/health', methods=['GET'])
@@ -130,43 +141,7 @@ def download_video():
         )
         
     except yt_dlp.DownloadError as e:
-        return jsonify({'error': f'Erro no download: {str(e)}'}), 400
-    except Exception as e:
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
-
-@app.route('/info', methods=['POST'])
-def get_video_info():
-    """Obter apenas informações do vídeo sem baixar"""
-    try:
-        if not request.is_json:
-            return jsonify({'error': 'Content-Type deve ser application/json'}), 400
-        
-        data = request.get_json()
-        url = data.get('url')
-        
-        if not url:
-            return jsonify({'error': 'URL é obrigatória'}), 400
-        
-        # Configurar yt-dlp apenas para extrair info
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-        }
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            
+        error_msg = str(e)
+        if "Sign in to confirm" in error_msg or "bot" in error_msg:
             return jsonify({
-                'title': info.get('title'),
-                'uploader': info.get('uploader'),
-                'duration': info.get('duration'),
-                'view_count': info.get('view_count'),
-                'upload_date': info.get('upload_date'),
-                'description': info.get('description', '')[:200] + '...' if info.get('description') else None
-            })
-            
-    except Exception as e:
-        return jsonify({'error': f'Erro ao obter informações: {str(e)}'}), 400
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+                'error': 'Vídeo temporariamente bloquead
